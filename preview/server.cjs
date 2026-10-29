@@ -31,7 +31,7 @@ const server=http.createServer(async(req,res)=>{
   let url;try{url=decodeURIComponent(new URL(req.url,'http://localhost').pathname);}catch{send(res,400,{error:'地址格式不正确'});return;}
   if(url.startsWith('/api/')){
    if(!['GET','HEAD','POST'].includes(req.method)){send(res,405,{error:'不支持的操作'});return;}
-   if(url==='/api/health'&&req.method==='GET'){send(res,200,{name:'personal-workbench',version:'0.2'});return;}
+   if(url==='/api/health'&&req.method==='GET'){send(res,200,{name:'personal-workbench',version:fs.readFileSync(path.resolve(__dirname,'../VERSION'),'utf8').trim()});return;}
    if(url==='/api/library'&&req.method==='GET'){send(res,200,current.catalog);return;}
    if(url==='/api/library/refresh'&&req.method==='POST'){send(res,200,refreshCatalog());return;}
    if(url==='/api/state'&&req.method==='GET'){send(res,200,{state:library.readState(localDir)});return;}

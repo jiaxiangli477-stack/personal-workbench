@@ -2,6 +2,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
+const {reviewedCards}=require('./distillations.cjs');
 const previewExtensions=new Set(['.md','.txt','.mp4','.webm','.png','.jpg','.jpeg','.webp','.gif','.pdf']);
 function redact(value){return String(value??'')
  .replace(/\b(?:sk-|sk-proj-)[A-Za-z0-9_-]{15,}/g,'[密钥已脱敏]')
@@ -9,7 +10,7 @@ function redact(value){return String(value??'')
  .replace(/(?:vless|vmess|trojan):\/\/[^\s]+/gi,'[节点凭据已隐藏]');}
 function json(file,fallback={}){try{return JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));}catch{return fallback;}}
 function fileId(p){return crypto.createHash('sha256').update(path.resolve(p).toLowerCase()).digest('hex').slice(0,24);}
-function buildCatalog(projectInput={},knowledgeInput={}){
+function buildCatalog(projectInput={},knowledgeInput={},distillationInput={}){
  const files=new Map();
  function reference(ref){
   const r=typeof ref==='string'?{path:ref}:({...ref});if(!r.path||typeof r.path!=='string')return r;
@@ -30,10 +31,11 @@ function buildCatalog(projectInput={},knowledgeInput={}){
   return item;
  };
  const catalog={version:2,updatedAt:new Date().toISOString(),projects:(projectInput.projects||[]).map(mapRecord),works:(projectInput.works||[]).map(mapRecord),ideas:(projectInput.ideas||[]).map(mapRecord),skills:(knowledgeInput.skills||[]).map(mapRecord),knowledge:(knowledgeInput.knowledge||[]).map(mapRecord),coverage:{projects:projectInput.coverage||{},knowledge:knowledgeInput.coverage||{}}};
- catalog.counts=Object.fromEntries(['projects','works','ideas','skills','knowledge'].map(k=>[k,catalog[k].length]));
+ const distilled=reviewedCards(distillationInput,{redact});catalog.distillations=distilled.cards.map(mapRecord);catalog.distillationIssues=distilled.issues;catalog.distillationReview={reviewedAt:distillationInput.reviewedAt||null,reviewStatus:distillationInput.reviewStatus||'none'};
+ catalog.counts=Object.fromEntries(['projects','works','ideas','skills','knowledge','distillations'].map(k=>[k,catalog[k].length]));
  return {catalog,files};
 }
-function loadCatalog(dir){const result=buildCatalog(json(path.join(dir,'intake-projects.json')),json(path.join(dir,'intake-knowledge.json')));for(const w of result.catalog.works)if(w.fileId&&fs.existsSync(path.join(dir,'thumbnails',w.fileId+'.jpg')))w.thumbnailUrl='/api/thumbnail/'+w.fileId;return result;}
+function loadCatalog(dir){const result=buildCatalog(json(path.join(dir,'intake-projects.json')),json(path.join(dir,'intake-knowledge.json')),json(path.join(dir,'distillations.json')));for(const w of result.catalog.works)if(w.fileId&&fs.existsSync(path.join(dir,'thumbnails',w.fileId+'.jpg')))w.thumbnailUrl='/api/thumbnail/'+w.fileId;return result;}
 function validateState(value){
  if(!value||value.version!==1)throw Error('无法识别记录版本');
  const out={version:1,modifiedAt:Number.isFinite(value.modifiedAt)?value.modifiedAt:Date.now(),done:{},trials:[],notes:{},reviews:{},tasks:[],ideas:[],connection:{}};
