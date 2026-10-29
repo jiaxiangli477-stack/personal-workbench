@@ -1,2 +1,2 @@
 @echo off
-start "" "%~dp0dist\index.html"
+"E:\Ai\node.js\node.exe" "%~dp0start.cjs"
