@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="description" content="个人成长与业务工作台，本地交互预览。">
+  <title>我的工作台 · 今天</title>
+  <link rel="icon" href="assets/compass.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="data.js"></script><script defer src="model.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <aside class="sidebar" id="sidebar" aria-label="工作台导航">
+    <a class="brand" href="#home"><span class="brand-mark"><img src="assets/compass.svg" alt=""></span><span>我的工作台<small>把想法，变成进展</small></span></a>
+    <div class="workspace-label">个人空间 <span>本地预览</span></div>
+    <nav id="nav" aria-label="主要板块"></nav>
+    <div class="sidebar-bottom"><div class="sidebar-note"><span class="tiny-dot"></span>留一点时间，做重要的事<p>每天约 1 小时，稳步积累。</p></div><button class="sidebar-help" data-action="guide"><img src="assets/circle-help.svg" alt="">使用说明与数据保存</button><div class="profile"><span class="avatar">我</span><div>个人成长与业务<small>本机使用 · v0.1</small></div><img src="assets/lock-keyhole.svg" alt="本地"></div></div>
+  </aside>
+  <button class="nav-scrim" id="scrim" aria-label="关闭导航" hidden></button>
+  <div class="app-shell">
+    <header class="topbar"><div class="breadcrumbs"><button class="icon-button mobile-menu" id="menu" aria-label="打开导航" aria-expanded="false"><img src="assets/menu.svg" alt=""></button><span>个人空间</span><span class="breadcrumb-separator">/</span><strong id="breadcrumb">首页总览</strong></div><div class="top-actions"><button class="search-trigger" data-action="search"><img src="assets/search.svg" alt=""><span>搜索板块、工具、项目</span><kbd>/</kbd></button><button class="icon-button" data-action="guide" aria-label="使用说明"><img src="assets/circle-help.svg" alt=""></button></div></header>
+    <div id="storage-warning" class="storage-warning" role="alert" hidden>当前浏览器无法保存数据，你仍可以浏览；关闭后改动可能丢失。</div>
+    <main id="main" tabindex="-1"></main>
+    <footer class="app-footer"><span>本地交互预览 · 建议任务与示例均已标注</span><span id="save-state">改动保存在当前浏览器</span></footer>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-top"><span id="dialog-eyebrow">查看详情</span><button class="icon-button" data-action="close" aria-label="关闭详情"><img src="assets/x.svg" alt=""></button></div><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status" class="toast"></div>
+  <noscript><p class="noscript">请开启浏览器的JavaScript，以点击浏览各个板块。</p></noscript>
+</body></html>
