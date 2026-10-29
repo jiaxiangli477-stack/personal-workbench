@@ -13,3 +13,6 @@ preview/.env.*
 docs/*
 !docs/frontend/
 !docs/frontend/**
+!README.md
+!VERSION
+!CHANGELOG.md
