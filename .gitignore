@@ -1,0 +1,9 @@
+*
+!.gitignore
+!preview/
+!preview/**
+preview/evidence/
+!docs/
+docs/*
+!docs/frontend/
+!docs/frontend/**
