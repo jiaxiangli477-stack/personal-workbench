@@ -7,7 +7,7 @@ window.WBData = {
     {id:'knowledge',name:'知识与 AI 能力',short:'知识与能力',icon:'book-open',desc:'找到已有的方法、工具和实践，让经验可以再次使用。',help:'Obsidian继续保存长期知识正文，这里记录入口、用途和实践证据。工具已安装，不代表已经稳定可用。'},
     {id:'radar',name:'资讯与机会',short:'资讯与工具',icon:'radar',desc:'看懂新变化，挑一件真正对你有用的事去尝试。',help:'资讯覆盖AI、外贸运营、独立站和内容平台。官方介绍、用户案例和亲手实测分别记录；推荐尝试不会自动执行。'},
     {id:'board',name:'思考画板',short:'画板',icon:'lightbulb',desc:'把零散想法摊开，慢慢找到值得推进的方向。',help:'这里先用想法便签整理关联。想法可以保留、延伸或转成任务；第一版支持新增便签，连线与自由拖拽留待后续。'},
-    {id:'review',name:'复盘与成长',short:'复盘',icon:'chart-no-axes-combined',desc:'回看投入与积累，决定接下来继续什么、调整什么。',help:'日记录留下一步，周复盘做取舍，月复盘看方向。记录保存在当前浏览器，不会自动写入Obsidian。'}
+    {id:'review',name:'复盘与成长',short:'复盘',icon:'chart-no-axes-combined',desc:'回看投入与积累，决定接下来继续什么、调整什么。',help:'日记录留下一步，周复盘做取舍，月复盘看方向。记录按日期或周期保存到本机文件，浏览器另留副本，不会自动写入Obsidian。'}
   ],
   tasks:[
     {id:'case',title:'挑一个真实案例，写清要解决的问题',minutes:20,tag:'内容准备',body:'建议从已有的外贸社媒工作台或产品属性填写案例中选择一个。只写清“原来遇到什么问题、AI做了哪一步、结果怎么检查”。',evidence:'完成标准：一段问题描述＋一个可核对的资料入口。'},

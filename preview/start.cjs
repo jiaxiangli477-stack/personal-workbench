@@ -1,13 +1,8 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');
-const url='http://localhost:8869';
-async function health(){try{const r=await fetch(url+'/api/health',{signal:AbortSignal.timeout(1000)});const j=await r.json();return j.name==='personal-workbench';}catch{return false;}}
-(async()=>{if(!await health()){
- const dir=path.resolve(__dirname,'local-data');fs.mkdirSync(dir,{recursive:true});
- const log=fs.openSync(path.join(dir,'server.log'),'a');
- const child=spawn(process.execPath,[path.join(__dirname,'server.cjs')],{cwd:__dirname,detached:true,windowsHide:true,stdio:['ignore',log,log]});child.unref();fs.closeSync(log);
- let ready=false;for(let n=0;n<25;n++){if(await health()){ready=true;break;}await new Promise(r=>setTimeout(r,200));}
- if(!ready){console.error('本机服务未启动。请检查8869端口是否被占用；记录位于preview/local-data/server.log。');process.exitCode=1;return;}
- }
- const child=process.platform==='win32'?spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{detached:true,windowsHide:true,stdio:'ignore'}):spawn(process.platform==='darwin'?'open':'xdg-open',[url],{detached:true,stdio:'ignore'});child.on('error',()=>console.log('请在浏览器打开 '+url));child.unref();console.log('工作台已就绪：'+url);
-})();
+const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');const {launch}=require('./lib/launcher.cjs');
+function visibleNotice(message,seconds=0){if(process.platform!=='win32'){console.error(message);return Promise.resolve('console');}return new Promise((resolve,reject)=>{const quoted=String(message).replace(/'/g,"''"),script="$s=New-Object -ComObject WScript.Shell; $r=$s.Popup('"+quoted+"',"+Math.max(0,Number(seconds)||0)+",'个人工作台',48); [Console]::Write($r)";const exe=path.join(process.env.SystemRoot||'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe');const child=spawn(exe,['-NoLogo','-NoProfile','-NonInteractive','-WindowStyle','Hidden','-Command',script],{windowsHide:true,stdio:['ignore','pipe','ignore']});let output='';child.stdout.on('data',chunk=>{output+=chunk;});child.once('error',reject);child.once('exit',code=>code===0?resolve(output.trim()):reject(Error('Windows提示未显示')));});}
+async function main(){const port=Number(process.env.WORKBENCH_PORT)||8869,url='http://localhost:'+port,expectedVersion=fs.readFileSync(path.resolve(__dirname,'../VERSION'),'utf8').trim();
+ const result=await launch({expectedVersion,port,notify:message=>visibleNotice(message,Number(process.env.WORKBENCH_NOTICE_TIMEOUT)||0),healthCheck:async timeout=>{try{const r=await fetch(url+'/api/health',{signal:AbortSignal.timeout(Math.max(1,timeout))});try{return await r.json();}catch{return {foreign:true};}}catch{return null;}},startServer:()=>new Promise((resolve,reject)=>{const dir=path.resolve(__dirname,'local-data');fs.mkdirSync(dir,{recursive:true});const log=fs.openSync(path.join(dir,'server.log'),'a');let child;try{child=spawn(process.execPath,[path.join(__dirname,'server.cjs')],{cwd:__dirname,detached:true,windowsHide:true,stdio:['ignore',log,log]});}finally{fs.closeSync(log);}child.once('error',reject);child.once('spawn',()=>{child.unref();resolve();});}),openBrowser:()=>new Promise((resolve,reject)=>{const child=process.platform==='win32'?spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{detached:true,windowsHide:true,stdio:'ignore'}):spawn(process.platform==='darwin'?'open':'xdg-open',[url],{detached:true,stdio:'ignore'});child.once('error',reject);child.once('spawn',()=>{child.unref();resolve();});})});console.log(JSON.stringify(result));if(!result.ok)process.exitCode=1;return result;
+}
+if(require.main===module)main().catch(async()=>{try{await visibleNotice('工作台启动出现异常。请检查8869端口，日志在 preview/local-data/server.log。',Number(process.env.WORKBENCH_NOTICE_TIMEOUT)||0);}catch{}process.exitCode=1;});
+module.exports={main,visibleNotice};

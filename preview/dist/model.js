@@ -1,22 +1,52 @@
-(function () {
-  'use strict';
-  function empty() { return {version:1,modifiedAt:0,done:{},trials:[],notes:{},reviews:{},tasks:[],ideas:[],connection:{}}; }
-  const record = v => v && typeof v === 'object' && !Array.isArray(v);
-  function restore(raw) {
-    const base=empty();
-    try { const v=JSON.parse(raw); if(!v || v.version!==1)return base;
-      for(const k of ['done','notes','reviews','connection']) if(record(v[k])) base[k]=v[k];
-      if(Number.isFinite(v.modifiedAt))base.modifiedAt=v.modifiedAt;
-      if(Array.isArray(v.trials))base.trials=[...new Set(v.trials.filter(x=>typeof x==='string'))];
-      if(Array.isArray(v.tasks))base.tasks=v.tasks.filter(t=>t&&typeof t.id==='string'&&typeof t.title==='string'&&Number.isFinite(t.minutes));
-      if(Array.isArray(v.ideas))base.ideas=v.ideas.filter(t=>t&&typeof t.title==='string'&&typeof t.body==='string');
-      return base;
-    } catch { return base; }
-  }
-  function toggleTask(s,id){s.done[id]=!s.done[id];return s.done[id];}
-  function addTrial(s,id){if(s.trials.includes(id))return false;s.trials.push(id);return true;}
-  function removeTrial(s,id){s.trials=s.trials.filter(x=>x!==id);}
-  function addTask(s,title,minutes){title=title.trim().slice(0,120);if(!title)return null;const t={id:'task-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),title,minutes:Math.min(180,Math.max(5,Number(minutes)||15)),tag:'我的安排',body:'你添加的本地任务。完成后可以勾选，也可以再次取消。'};s.tasks.push(t);return t;}
-  function chooseRecovery(local,disk){return (local?.modifiedAt||0)>(disk?.modifiedAt||0)?local:disk;}
-  window.WBModel={empty,restore,toggleTask,addTrial,removeTrial,addTask,chooseRecovery};
+(function(){
+ 'use strict';
+ const TZ='America/Los_Angeles',platformNames=['小红书','抖音','视频号'],periods=['daily','weekly','monthly'];
+ const record=v=>v&&typeof v==='object'&&!Array.isArray(v),str=(v,n=5000)=>typeof v==='string'?v.slice(0,n):'',id=prefix=>prefix+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,9);
+ function validDate(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v||''))return false;try{return new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;}catch{return false;}}
+ function todayKey(value=Date.now()){if(validDate(value))return value;const parts=new Intl.DateTimeFormat('en-US',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));return ['year','month','day'].map(k=>parts.find(p=>p.type===k).value).join('-');}
+ function nextDay(value=todayKey()){const [y,m,d]=todayKey(value).split('-').map(Number);return new Date(Date.UTC(y,m-1,d+1)).toISOString().slice(0,10);}
+ function weekKey(value=Date.now()){const day=new Date(todayKey(value)+'T00:00:00Z');day.setUTCDate(day.getUTCDate()+4-(day.getUTCDay()||7));const year=day.getUTCFullYear(),start=new Date(Date.UTC(year,0,1));return year+'-W'+String(Math.ceil((((day-start)/86400000)+1)/7)).padStart(2,'0');}
+ const monthKey=(value=Date.now())=>todayKey(value).slice(0,7),periodKey=(period,value=Date.now())=>period==='weekly'?weekKey(value):period==='monthly'?monthKey(value):todayKey(value);
+ function empty(){return {version:2,modifiedAt:0,done:{},trials:[],trialResults:{},notes:{},reviews:{daily:{},weekly:{},monthly:{}},tasks:[],ideas:[],topics:[],connection:{}};}
+ function safeUrl(value){if(!value)return '';try{const u=new URL(String(value));return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password?u.href.slice(0,2000):'';}catch{return '';}}
+ function topicData(input){const source=record(input.source)?input.source:{};const out={id:str(input.id,150)||id('topic'),title:str(input.title,160),createdAt:Number.isFinite(input.createdAt)?input.createdAt:Date.now(),source:{type:['work','idea','news','trial','ai','manual'].includes(source.type)?source.type:'manual',id:str(source.id,150),label:str(source.label,200)},problem:str(input.problem),steps:str(input.steps),result:str(input.result),check:str(input.check),feedback:str(input.feedback),status:['候选','制作中','已发','沉淀'].includes(input.status)?input.status:'候选',platforms:{}};for(const name of platformNames){const p=input.platforms?.[name]||{},status=['未做','草稿','已发'].includes(p.status)?p.status:'未做';out.platforms[name]={status,url:safeUrl(p.url),date:validDate(p.date)?p.date:status==='已发'?todayKey():''};}return out;}
+ function normalizeState(value){
+  if(!record(value)||![1,2].includes(value.version))throw Error('无法识别记录版本');const out=empty(),legacy=value.version===1;
+  if(Number.isFinite(value.modifiedAt))out.modifiedAt=value.modifiedAt;
+  if(record(value.done))for(const [key,v]of Object.entries(value.done))out.done[key]=!!v;
+  if(record(value.notes))for(const [key,v]of Object.entries(value.notes))if(typeof v==='string')out.notes[key]=v;
+  if(Array.isArray(value.trials))out.trials=[...new Set(value.trials.filter(v=>typeof v==='string'&&v))];
+  if(record(value.trialResults))for(const [key,v]of Object.entries(value.trialResults))if(record(v))out.trialResults[key]={what:str(v.what),result:str(v.result),canTeach:v.canTeach===true,createdAt:Number.isFinite(v.createdAt)?v.createdAt:Date.now()};
+  if(Array.isArray(value.tasks))out.tasks=value.tasks.filter(t=>record(t)&&typeof t.id==='string'&&typeof t.title==='string'&&Number.isFinite(t.minutes)).map(t=>({...t,date:validDate(t.date)?t.date:todayKey(),doneAt:Number.isFinite(t.doneAt)?t.doneAt:legacy&&out.done[t.id]?Date.now():null,...(legacy&&out.done[t.id]&&!Number.isFinite(t.doneAt)?{legacyDoneTime:true}:{}),sourceType:str(t.sourceType,40)||(t.sourceCardId?'method':'manual'),sourceId:str(t.sourceId,150)||str(t.sourceCardId,150)}));
+  if(legacy)for(const trial of out.trials)if(!out.tasks.some(t=>t.id==='trial-'+trial))out.tasks.push({id:'trial-'+trial,title:'试一试 '+trial,minutes:20,tag:'工具试用',body:'记录一次真实工具试用',evidence:'留下试用结果和是否值得分享的判断',date:todayKey(),doneAt:out.done['trial-'+trial]?Date.now():null,legacyDoneTime:!!out.done['trial-'+trial],legacyTrial:true,sourceType:'trial',sourceId:trial});
+  for(const period of periods){const old=value.reviews?.[period];if(Array.isArray(old))out.reviews[period][periodKey(period)]=old.map(v=>str(v));else if(record(old))for(const [key,v]of Object.entries(old))if(validReviewKey(period,key)&&Array.isArray(v))out.reviews[period][key]=v.map(x=>str(x));}
+  if(Array.isArray(value.ideas))out.ideas=value.ideas.filter(v=>record(v)&&typeof v.title==='string'&&typeof v.body==='string').map((v,i)=>({...v,id:str(v.id,150)||'user-idea-legacy-'+i}));
+  if(Array.isArray(value.topics))out.topics=value.topics.filter(v=>record(v)&&typeof v.title==='string').map(topicData);
+  if(record(value.connection))for(const key of ['provider','baseUrl','model','purpose'])if(typeof value.connection[key]==='string')out.connection[key]=value.connection[key].slice(0,1000);
+  return out;
+ }
+ function restore(raw){try{return normalizeState(JSON.parse(raw));}catch{return empty();}}
+ function toggleTask(state,key){const task=state.tasks.find(t=>t.id===key);if(task){task.doneAt=task.doneAt===null||task.doneAt===undefined?Date.now():null;delete task.legacyDoneTime;state.done[key]=task.doneAt!==null;return state.done[key];}state.done[key]=!state.done[key];return state.done[key];}
+ function addTask(state,title,minutes=20,details={}){title=String(title||'').trim().slice(0,120);if(!title)return null;const date=validDate(details.date)?details.date:todayKey();if(details.dedupe){const old=state.tasks.find(t=>t.date===date&&t.title===title&&t.sourceType===details.sourceType&&t.sourceId===details.sourceId);if(old)return old;}const task={id:id('task'),title,minutes:Math.min(180,Math.max(5,Number(minutes)||20)),tag:str(details.tag,80)||'我的安排',body:str(details.body)||'你添加的本地任务。',evidence:str(details.evidence),date,doneAt:null,sourceType:str(details.sourceType,40)||'manual',sourceId:str(details.sourceId,150)};state.tasks.push(task);return task;}
+ function carryOver(state,value=todayKey()){return state.tasks.filter(t=>t.date<todayKey(value)&&t.doneAt===null);}
+ function bringToToday(state,key){const task=state.tasks.find(t=>t.id===key);if(!task||task.doneAt!==null)return false;task.date=todayKey();return true;}
+ function deleteTask(state,key){const task=state.tasks.find(t=>t.id===key);if(!task)return false;state.tasks=state.tasks.filter(t=>t.id!==key);delete state.done[key];if(task.sourceType==='trial')state.trials=state.trials.filter(t=>t!==task.sourceId);return true;}
+ function addTrial(state,key,details={}){if(state.trials.includes(key))return false;state.trials.push(key);addTask(state,details.title||'试一试 '+key,details.minutes||20,{...details,tag:'工具试用',sourceType:'trial',sourceId:key});return true;}
+ function removeTrial(state,key){state.trials=state.trials.filter(v=>v!==key);state.tasks=state.tasks.filter(t=>!(t.sourceType==='trial'&&t.sourceId===key&&t.doneAt===null));}
+ function saveTrialResult(state,key,value){const result={what:str(value.what),result:str(value.result),canTeach:value.canTeach===true,createdAt:Date.now()};state.trialResults[key]=result;return result;}
+ function validReviewKey(period,key){return period==='daily'?validDate(key):period==='weekly'?/^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/.test(key):period==='monthly'?/^\d{4}-(0[1-9]|1[0-2])$/.test(key):false;}
+ function saveReview(state,period,key,values){if(!periods.includes(period)||!validReviewKey(period,key)||!Array.isArray(values))throw Error('复盘日期或内容不正确');state.reviews[period][key]=values.map(v=>str(v));return state.reviews[period][key];}
+ function reviewEntries(state,period,limit=7){return Object.entries(state.reviews[period]||{}).sort(([a],[b])=>b.localeCompare(a)).slice(0,limit).map(([key,values])=>({key,values}));}
+ function reviewNextTask(state,date=todayKey()){const text=state.reviews.daily[date]?.[2]?.trim();return text?addTask(state,text,20,{date:nextDay(date),body:text,sourceType:'review',sourceId:'daily:'+date,dedupe:true}):null;}
+ function addTopic(state,input){if(!String(input.title||'').trim())return null;const topic=topicData(input);state.topics.push(topic);return topic;}
+ function updateTopic(state,key,changes){const topic=state.topics.find(t=>t.id===key);if(!topic)return null;Object.assign(topic,topicData({...topic,...changes,id:topic.id,createdAt:topic.createdAt,source:changes.source||topic.source,platforms:{...topic.platforms,...changes.platforms}}));return topic;}
+ function deleteTopic(state,key){const before=state.topics.length;state.topics=state.topics.filter(t=>t.id!==key);return state.topics.length!==before;}
+ function publishedThisWeek(state,value=todayKey()){const week=weekKey(value);return state.topics.filter(t=>platformNames.some(p=>t.platforms[p]?.status==='已发'&&validDate(t.platforms[p].date)&&weekKey(t.platforms[p].date)===week));}
+ function platformTopics(state,name){return state.topics.map(topic=>({topic,platform:topic.platforms[name]}));}
+ function topicStep(topic){return !topic.problem?'问题':!topic.steps?'操作步骤':!topic.result?'结果':!topic.check?'怎样验收':!platformNames.some(p=>topic.platforms[p].status!=='未做')?'平台草稿':!platformNames.some(p=>topic.platforms[p].status==='已发')?'发布':!topic.feedback?'反馈':'沉淀';}
+ function addIdea(state,input){const idea={id:id('user-idea'),title:str(input.title,120),body:str(input.body,5000),lane:str(input.lane,60)||'灵感收集',sourceType:str(input.sourceType,40)||'manual',sourceId:str(input.sourceId,150)};if(!idea.title.trim()||!idea.body.trim())return null;state.ideas.push(idea);return idea;}
+ function deleteIdea(state,key){const before=state.ideas.length;state.ideas=state.ideas.filter(v=>v.id!==key);return before!==state.ideas.length;}
+ const chooseRecovery=(local,disk)=>(local?.modifiedAt||0)>(disk?.modifiedAt||0)?local:disk;
+ const api={empty,restore,normalizeState,todayKey,weekKey,monthKey,nextDay,periodKey,validDate,toggleTask,addTask,carryOver,bringToToday,deleteTask,addTrial,removeTrial,saveTrialResult,saveReview,reviewEntries,reviewNextTask,addTopic,updateTopic,deleteTopic,publishedThisWeek,platformTopics,topicStep,addIdea,deleteIdea,chooseRecovery,platformNames};
+ if(typeof window!=='undefined')window.WBModel=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })();
