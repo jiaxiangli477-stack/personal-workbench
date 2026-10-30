@@ -1,6 +1,6 @@
 # 半成品个人工作台
 
-**当前版本：v0.4.0（本地迭代） · Work in progress / 半成品。**
+**当前版本：v0.4.1（本地迭代） · Work in progress / 半成品。**
 
 这是一个仍在本地迭代的个人成长与业务工作台，用于连接今日任务、项目进度、知识与 Skill、作品、想法、公开资讯和复盘。当前不作为成熟产品或生产服务。
 
@@ -28,7 +28,7 @@ node preview/server.cjs
 
 打开 http://localhost:8869 。Windows 启动辅助脚本中的 Node 路径按实际安装位置调整；可用 WORKBENCH_PYTHON 指向已有 Python。无需部署或安装新的 npm 依赖。
 
-启动入口会等待最多30秒；失败或仍运行旧版本时显示系统提示。服务先监听再在后台线程整理资料，加载期间页面有明确状态和有界重试。
+Windows快捷启动优先用已安装的Edge应用窗口打开，不修改系统默认浏览器；没有Edge才沿用默认浏览器。启动入口会等待最多30秒；失败或仍运行旧版本时显示系统提示。服务先监听再在后台线程整理资料，加载期间页面有明确状态和有界重试。
 
 ## 备份范围
 
@@ -50,6 +50,6 @@ node preview/tools/verify.cjs
 
 ## 版本
 
-版本号见 [VERSION](VERSION)，变更见 [CHANGELOG.md](CHANGELOG.md)。已核验过的GitHub备份点为v0.2.0；本轮v0.4.0只保存本地Git，未推送，不标为生产稳定版。改版范围见 [v0.4计划](docs/frontend/V04-DAILY-CONTENT-PLAN.md)。
+版本号见 [VERSION](VERSION)，变更见 [CHANGELOG.md](CHANGELOG.md)。本次按用户要求同步筛选源码至既有私有GitHub仓库；当前仍为半成品，未部署。历史v0.2.0备份标签保留，新的备份以main的具体提交为准。改版范围见 [v0.4计划](docs/frontend/V04-DAILY-CONTENT-PLAN.md)。
 
 第三方Lucide图标许可保留在 preview/dist/assets/LUCIDE-LICENSE.txt。
