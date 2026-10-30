@@ -2,11 +2,16 @@
 const http=require('node:http');
 const fs=require('node:fs');
 const path=require('node:path');
+const crypto=require('node:crypto');
 const library=require('./lib/library.cjs');
 const {allowRequest}=require('./lib/http-guard.cjs');
 const root=path.resolve(__dirname,'dist');
 const localDir=path.resolve(__dirname,'local-data');
 const cacheDir=path.resolve(__dirname,'public-cache');
+const {createRelay,RelayError}=require('./lib/ai-relay.cjs');
+const ai=createRelay({localDir});
+const loadedVersion=fs.readFileSync(path.resolve(__dirname,'../VERSION'),'utf8').trim();
+const codeFingerprint=crypto.createHash('sha256').update(Buffer.concat(['server.cjs','lib/ai-config.cjs','lib/ai-relay.cjs','lib/ai-images.cjs'].map(name=>fs.readFileSync(path.join(__dirname,name))))).digest('hex');
 const port=Number(process.env.WORKBENCH_PORT)||8869;
 const hosts=new Set(['localhost:'+port,'127.0.0.1:'+port]);
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.pdf':'application/pdf'};
@@ -31,7 +36,16 @@ const server=http.createServer(async(req,res)=>{
   let url;try{url=decodeURIComponent(new URL(req.url,'http://localhost').pathname);}catch{send(res,400,{error:'地址格式不正确'});return;}
   if(url.startsWith('/api/')){
    if(!['GET','HEAD','POST'].includes(req.method)){send(res,405,{error:'不支持的操作'});return;}
-   if(url==='/api/health'&&req.method==='GET'){send(res,200,{name:'personal-workbench',version:fs.readFileSync(path.resolve(__dirname,'../VERSION'),'utf8').trim()});return;}
+   if(url==='/api/health'&&req.method==='GET'){send(res,200,{name:'personal-workbench',version:loadedVersion,codeFingerprint});return;}
+   if(url==='/api/ai/status'&&req.method==='GET'){send(res,200,ai.status());return;}
+   if(['/api/ai/text','/api/ai/image'].includes(url)&&req.method==='POST'){
+    if(req.headers['x-workbench-action']!=='manual'||!String(req.headers['content-type']||'').startsWith('application/json')){send(res,403,{error:'请通过工作台的生成按钮手动提交'});return;}
+    try{send(res,200,await ai.run(url.endsWith('/text')?'text':'image',await body(req)));}
+    catch(error){const known=error instanceof RelayError;const status=error.code==='busy'?409:error.code==='uncertain'?504:known&&['input','previous_failure'].includes(error.code)?400:502;send(res,status,{error:known?error.message:'AI请求未完成，请核对本机连接表与输入格式',code:known?error.code:'configuration',attempts:known?error.attempts:[]});}
+    return;
+   }
+   const aiImage=/^\/api\/ai\/image\/([a-f0-9]{24})$/.exec(url);
+   if(aiImage&&['GET','HEAD'].includes(req.method)){const file=ai.imageFile(aiImage[1]);if(file){media(req,res,file);}else send(res,404,{error:'没有找到这张本机生成图片'});return;}
    if(url==='/api/library'&&req.method==='GET'){send(res,200,current.catalog);return;}
    if(url==='/api/library/refresh'&&req.method==='POST'){send(res,200,refreshCatalog());return;}
    if(url==='/api/state'&&req.method==='GET'){send(res,200,{state:library.readState(localDir)});return;}

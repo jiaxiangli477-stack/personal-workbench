@@ -56,7 +56,7 @@
   });
   document.addEventListener('change',ev=>{if(ev.target.matches('[data-task]')){const id=ev.target.dataset.task;M.toggleTask(state,id);save();render();$('#done-'+id)?.focus();}});
   document.addEventListener('input',ev=>{E?.handleInput(ev.target);if(ev.target.id==='search-input')searchResults(ev.target.value);if(ev.target.id==='section-note'){state.notes[route]=ev.target.value;save();}if(ev.target.closest('#review-form')){const f=new FormData($('#review-form'));state.reviews[reviewPeriod]=[0,1,2].map(i=>String(f.get('review-'+i)||''));save();}});
-  document.addEventListener('submit',ev=>{if(ev.target.id==='connection-form'){ev.preventDefault();E?.handleSubmit(ev.target);return;}if(!['note-form','review-form','task-form','idea-form'].includes(ev.target.id))return;ev.preventDefault();const f=new FormData(ev.target);
+  document.addEventListener('submit',ev=>{if(['connection-form','ai-text-form','ai-image-form'].includes(ev.target.id)){ev.preventDefault();E?.handleSubmit(ev.target);return;}if(!['note-form','review-form','task-form','idea-form'].includes(ev.target.id))return;ev.preventDefault();const f=new FormData(ev.target);
     if(ev.target.id==='note-form'){state.notes[route]=String(f.get('note')||'');save();toast('板块备注已保存');}
     if(ev.target.id==='review-form'){state.reviews[reviewPeriod]=[0,1,2].map(i=>String(f.get('review-'+i)||''));save();toast(reviewConfig[reviewPeriod].name+'已保存');}
     if(ev.target.id==='task-form'){if(!M.addTask(state,String(f.get('title')),f.get('minutes'))){toast('请写一个具体任务');return;}save();$('#dialog').close();render();toast('已添加到今日任务');}
@@ -66,7 +66,7 @@
   $('#scrim').addEventListener('click',closeMenu);
   document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if($('#dialog').open){ev.preventDefault();$('#dialog').close();}closeMenu();}if(ev.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)&&!$('#dialog').open){ev.preventDefault();$('.search-trigger').click();}});
   $('.skip-link').addEventListener('click',ev=>{ev.preventDefault();$('#main').focus();});
-  D.sections.push({id:'connections',name:'AI 与中转连接',short:'AI连接',icon:'compass',desc:'先让公开来源更新，再按需要接入模型与中转服务。',help:'当前支持非敏感连接草稿，尚未接受密钥或调用付费API。联网来源、模型理解和私人资料授权分别管理。'});
+  D.sections.push({id:'connections',name:'AI 与中转连接',short:'AI连接',icon:'compass',desc:'手动使用文字和生图，查看连接线路与实际结果。',help:'支持手动文字与生图，由本机服务读取私有密钥。只发送当前输入；资讯抓取、模型生成与私人资料授权分别管理。'});
   E=window.WBEnrich({D,M,esc,icon,badge,heading,link,modal,toast,render,allTasks,tasksHTML,projectHTML,toolHTML,trialList,getState:()=>state,setState:v=>{state=v},save,go:id=>{if(location.hash==='#'+id)render();else location.hash=id},getPlatform:()=>platform,setPlatform:v=>{platform=v}});
   window.addEventListener('hashchange',navigate);navigate();E.init();
 })();
