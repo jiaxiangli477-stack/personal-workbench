@@ -11,8 +11,9 @@ const localDir=path.resolve(process.env.WORKBENCH_LOCAL_DATA_DIR||path.join(__di
 const cacheDir=path.resolve(process.env.WORKBENCH_PUBLIC_CACHE_DIR||path.join(__dirname,'public-cache'));
 const {createRelay,RelayError}=require('./lib/ai-relay.cjs');
 const ai=createRelay({localDir,maxUpstreamCalls:process.env.WORKBENCH_AI_MAX_CALLS===undefined?Infinity:Number(process.env.WORKBENCH_AI_MAX_CALLS)});
+const webResearch=require('./lib/web-research.cjs').createWebResearch({dir:path.join(localDir,'web-research'),configured:()=>!!process.env.TAVILY_API_KEY,searchClient:require('./lib/tavily-client.cjs').createSearchClient({dir:localDir}),maxSearchCalls:process.env.WORKBENCH_SEARCH_MAX_CALLS===undefined?Infinity:Number(process.env.WORKBENCH_SEARCH_MAX_CALLS),analyzeText:({prompt,requestId,source,publicInput})=>ai.run('text',{prompt,requestId},{source:{...source,type:'research'},publicInput})});
 const loadedVersion=fs.readFileSync(path.resolve(__dirname,'../VERSION'),'utf8').trim();
-const codeFingerprint=crypto.createHash('sha256').update(Buffer.concat(['server.cjs','lib/ai-config.cjs','lib/ai-relay.cjs','lib/ai-images.cjs','lib/catalog-loader.cjs','lib/catalog-worker.cjs','lib/library.cjs','dist/model.js','lib/growth-store.cjs','dist/growth-model.js','lib/site-health.cjs','lib/site-probe.ps1'].map(name=>fs.readFileSync(path.join(__dirname,name))))).digest('hex');
+const codeFingerprint=crypto.createHash('sha256').update(Buffer.concat(['server.cjs','lib/ai-config.cjs','lib/ai-relay.cjs','lib/ai-images.cjs','lib/catalog-loader.cjs','lib/catalog-worker.cjs','lib/library.cjs','dist/model.js','lib/growth-store.cjs','dist/growth-model.js','lib/site-health.cjs','lib/site-probe.ps1','lib/web-research.cjs','lib/tavily-client.cjs','lib/tavily-search.ps1'].map(name=>fs.readFileSync(path.join(__dirname,name))))).digest('hex');
 const siteHealth=require('./lib/site-health.cjs').createSiteHealth({dir:localDir});
 const port=Number(process.env.WORKBENCH_PORT)||8869;
 const hosts=new Set(['localhost:'+port,'127.0.0.1:'+port]);
@@ -39,6 +40,10 @@ const server=http.createServer(async(req,res)=>{
   if(url.startsWith('/api/')){
    if(!['GET','HEAD','POST'].includes(req.method)){send(res,405,{error:'不支持的操作'});return;}
    if(url==='/api/health'&&req.method==='GET'){send(res,200,{name:'personal-workbench',version:loadedVersion,codeFingerprint,loading:catalogLoader.loading,...(catalogLoader.error?{error:catalogLoader.error}:{}),aiCalls:ai.diagnostics()});return;}
+   if(url==='/api/web-research/status'&&req.method==='GET'){send(res,200,webResearch.status());return;}
+   const researchMatch=/^\/api\/web-research\/search\/([A-Za-z0-9-]{12,100})$/.exec(url);
+   if(researchMatch&&req.method==='GET'){try{send(res,200,webResearch.getSearch(researchMatch[1]));}catch(e){send(res,e.httpStatus||400,{error:e.message,code:e.code});}return;}
+   if(['/api/web-research/search','/api/web-research/analyze'].includes(url)&&req.method==='POST'){if(req.headers['x-workbench-action']!=='manual'||!String(req.headers['content-type']||'').startsWith('application/json')){send(res,403,{error:'请点击研究页按钮手动提交'});return;}try{const input=await body(req);send(res,200,url.endsWith('/search')?await webResearch.search(input):await webResearch.analyze(input));}catch(e){send(res,e.httpStatus||400,{error:e.code?e.message:'研究未完成，请先查看最近记录，勿重复提交',code:e.code||'request'});}return;}
    if(url==='/api/growth'&&req.method==='GET'){send(res,200,{state:require('./lib/growth-store.cjs').readGrowth(localDir)});return;}
    if(url==='/api/growth'&&req.method==='POST'){const revision=req.headers['x-workbench-growth-revision'];if(!/^\d+$/.test(revision||'')){send(res,400,{error:'请先读取最新资料再保存'});return;}try{send(res,200,{saved:true,state:require('./lib/growth-store.cjs').writeGrowth(localDir,await body(req),{expectedModifiedAt:Number(revision)})});}catch(err){if(err.code==='conflict')send(res,409,{error:err.message});else throw err;}return;}
    if(url==='/api/site-health'&&req.method==='GET'){send(res,200,siteHealth.read());return;}

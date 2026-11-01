@@ -9,11 +9,11 @@ function createRelay({configLoader=loadConfig,localDir,fetchImpl=fetch,maxUpstre
  const dir=path.resolve(localDir,'ai-results'),imageDir=path.join(dir,'images'),stateFile=path.join(dir,'runs.json');let records=[],active=null,upstreamCalls=0;const callLimit=Number.isFinite(maxUpstreamCalls)?Math.max(0,maxUpstreamCalls):Infinity;
  try{const saved=JSON.parse(fs.readFileSync(stateFile,'utf8'));if(Array.isArray(saved))records=saved;}catch(error){if(error.code!=='ENOENT')throw Error('AI本地记录无法读取，请先核对文件');}
  function save(){fs.mkdirSync(imageDir,{recursive:true});const temporary=stateFile+'.tmp';fs.writeFileSync(temporary,JSON.stringify(records,null,2));fs.renameSync(temporary,stateFile);}
- function status(){const diagnostics={upstreamCalls,callLimit:Number.isFinite(callLimit)?callLimit:null};try{const config=configLoader();return {...publicConfig(config),busy:!!active,diagnostics,recent:records.slice(-8).reverse().map(r=>r.result||{requestId:r.requestId,kind:r.kind,status:r.status,error:r.error||null,attempts:r.attempts||[]})};}catch{return {providers:[],busy:!!active,diagnostics,recent:[],notice:'本机连接表无法读取，请核对格式后重新读取'};}}
+ function status(){const diagnostics={upstreamCalls,callLimit:Number.isFinite(callLimit)?callLimit:null};try{const config=configLoader();return {...publicConfig(config),busy:!!active,diagnostics,recent:records.filter(r=>(r.source||r.result?.source)?.type!=='research').slice(-8).reverse().map(r=>r.result||{requestId:r.requestId,kind:r.kind,status:r.status,error:r.error||null,attempts:r.attempts||[]})};}catch{return {providers:[],busy:!!active,diagnostics,recent:[],notice:'本机连接表无法读取，请核对格式后重新读取'};}}
  function imageFile(id){if(!/^[a-f0-9]{24}$/.test(id))return null;const file=path.join(imageDir,id+'.png');return fs.existsSync(file)?file:null;}
- async function call(provider,kind,prompt,config){
+ async function call(provider,kind,prompt,config,options={}){
   if(!provider.keys[kind])throw new RelayError('not_configured','这条线路尚未填写密钥');
-  const payload=kind==='text'?{model:provider.models.text,messages:[{role:'user',content:prompt}],max_tokens:1200,stream:false}:{model:provider.models.image,prompt,size:'1024x1024',n:1};
+  const payload=kind==='text'?{model:provider.models.text,messages:[{role:'user',content:prompt}],max_tokens:options.maxTokens||1200,stream:false}:{model:provider.models.image,prompt,size:'1024x1024',n:1};
   if(upstreamCalls>=callLimit)throw new RelayError('budget','本轮验收的真实调用次数已用完，不再发送上游请求');upstreamCalls++;
   let response,body;
   try{response=await fetchImpl(endpointFor(provider,kind),{method:'POST',headers:{Authorization:'Bearer '+provider.keys[kind],'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(kind==='image'?180000:60000)});const bytes=await readLimited(response,kind==='image'?36*1024*1024:2*1024*1024);try{body=JSON.parse(bytes.toString('utf8'));}catch{throw new RelayError('format','服务返回了网页或无法识别的内容，未当作生成成功');}}
@@ -51,7 +51,7 @@ function createRelay({configLoader=loadConfig,localDir,fetchImpl=fetch,maxUpstre
    try{
     for(const provider of config.providers){
      try{
-      const value=await call(provider,kind,prompt,config);attempts.push({provider:provider.id,name:provider.name,status:'ok'});
+      const value=await call(provider,kind,prompt,config,{maxTokens:context?.source?.type==='research'?2200:1200});attempts.push({provider:provider.id,name:provider.name,status:'ok'});
       const result={ok:true,requestId:input.requestId,kind,provider:provider.id,providerName:provider.name,model:provider.models[kind],usedFallback:provider.id==='backup',createdAt:new Date().toISOString(),attempts,...value,...(context?{source:context.source,publicInput:context.publicInput}:{})};record.status='done';record.result=result;
       // Generation has completed. A local save error must never trigger another provider.
       try{save();}catch{result.storageWarning='模型结果已返回，但本机记录保存失败。请复制文字或下载图片，勿重复生成。';}
@@ -59,7 +59,7 @@ function createRelay({configLoader=loadConfig,localDir,fetchImpl=fetch,maxUpstre
      }catch(error){
       const code=error instanceof RelayError?error.code:'storage';const message=error instanceof RelayError?error.message:'本机结果保存失败，请先检查资料目录';
       attempts.push({provider:provider.id,name:provider.name,status:'error',code,message:redact(message,config),...(error.httpStatus?{httpStatus:error.httpStatus}:{})});
-      if(provider.id==='primary'&&code!=='budget'&&(kind==='text'||['rejected','not_configured'].includes(code)))continue;
+      if(provider.id==='primary'&&context?.source?.type!=='research'&&code!=='budget'&&(kind==='text'||['rejected','not_configured'].includes(code)))continue;
       throw new RelayError(code,message,attempts);
      }
     }
