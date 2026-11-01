@@ -91,7 +91,7 @@
     }
     const growthUI=window.WBGrowthUI(ctx,{getLibrary:()=>L,getNews:()=>news,createTopic:value=>topicUI.create(value),addTask,openRecord:openGrowthRecord});
     const siteUI=window.WBSiteHealthUI(ctx);
-    const onlineUI=window.WBOnlineResearchUI(ctx,{createTopic:value=>topicUI.create(value),addTask});
+    const onlineUI=window.WBOnlineResearchUI(ctx,{createTopic:value=>{if(!hydrated){toast('本机记录尚未连接，请稍候');return;}const title=String(value.title||'').trim().slice(0,160),existing=ctx.getState().topics.find(t=>t.title===title&&t.source?.id===value.source?.id);if(existing){toast('这条内容已在选题库中');return;}const topic=M.addTopic(ctx.getState(),{...value,title,status:'候选'});if(topic){ctx.save();toast('已加入选题库，可在内容与IP里继续编辑');ctx.render();}},addTask});
     return {isReady:()=>hydrated,handleToggle:id=>hydrated?dailyUI.toggle(id):false,views:{home,research,projects,content,business,knowledge,radar,board,connections,review:dailyUI.review},handleClick,handleSubmit,handleInput,extendSearch,search:(q,kind)=>growthUI.search(q,kind),persist,init};
   };
 })();
