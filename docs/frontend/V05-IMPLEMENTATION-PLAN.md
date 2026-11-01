@@ -10,10 +10,10 @@
 
 ## 并行任务与文件所有权
 
-- [ ] growth_model：dist/growth-model.js、lib/growth-store.cjs及对应tests。纯模型负责空值/URL/文本校验、参考/对标/主题/IP保存、跨类型搜索。独立本地store负责校验、原子写和上一份备份。不得读写现有用户状态或密钥。
-- [ ] growth_ui：dist/growth-ui.js、dist/growth.css及对应tests。统一搜索、参考/研究/对标表单与详情、IP定位/系列；结果可转选题/任务；加载失败不覆盖已存数据。
-- [ ] topic_flow：dist/model.js、topic-ui.js、daily-ui.js、app.js的任务详情及对应tests。兼容旧v2；选题简化创建与折叠阶段，任务返回选题并保存结果/证据。app.js交付后总控再作入口集成，不并行改同文件。
-- [ ] 总控：Packrivo lib/site-health.cjs、dist/site-health-ui.js、tests；server/index/data/enrich/styles入口、首页与CSS整合；旧公开演示生成器固定v0.4.1基线；原始备份、QA清理、状态文档与收尾。
+- [x] growth_model：dist/growth-model.js、lib/growth-store.cjs及对应tests。纯模型负责空值/URL/文本校验、参考/对标/主题/IP保存、跨类型搜索。独立本地store负责校验、原子写和上一份备份。不得读写现有用户状态或密钥。
+- [x] growth_ui：dist/growth-ui.js、dist/growth.css及对应tests。统一搜索、参考/研究/对标表单与详情、IP定位/系列；结果可转选题/任务；加载失败不覆盖已存数据。
+- [x] topic_flow：dist/model.js、topic-ui.js、daily-ui.js、app.js的任务详情及对应tests。兼容旧v2；选题简化创建与折叠阶段，任务返回选题并保存结果/证据。app.js交付后总控再作入口集成，不并行改同文件。
+- [x] 总控：Packrivo lib/site-health.cjs、dist/site-health-ui.js、tests；server/index/data/enrich/styles入口、首页与CSS整合；旧公开演示生成器固定v0.4.1基线；原始备份、QA清理、状态文档与收尾。
 
 ## 新资料契约
 
@@ -42,3 +42,6 @@ growth UI工厂：WBGrowthUI(ctx,helpers)，ctx含D/M/esc/icon/badge/heading/lin
 7. QA按专用ID和标记清理，只删除测试记录；核对原数据仍在；独立只读代码审查后修复重要问题。保存本地Git版本、证据、CURRENT-STATE、决定和manifest，交付本地URL及截图。
 
 Jev：route/growth_model/growth_ui选中；topic_flow为needs_review（0.78），不当权限批准。通过升级前字节备份、旧v2归一化保留测试、实际读回与独立审查处理此兼容风险，不重复请求用户已给的实施授权。
+
+
+完成验证：142/142，全链路浏览器与390布局，Packrivo3入口200；同名健康检查采用本机已装PowerShell7系统网络，保留HTTPS验证。结果与限制以CURRENT-STATE和verification-0.5.0.json为准。

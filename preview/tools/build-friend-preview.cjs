@@ -5,8 +5,9 @@ const project=path.resolve(__dirname,'../..'),out=path.join(project,'friend-prev
 if(!/^[DE]:/i.test(out))throw Error('Demo output must remain on D/E');
 fs.mkdirSync(dist,{recursive:true});fs.mkdirSync(path.join(dist,'assets'),{recursive:true});
 const files=['index.html','app.js','model.js','topic-ui.js','daily-ui.js','distill-ui.js','enrich.js','styles.css','enrich.css','distill.css','ai.css','topic.css'];
+const frozen='v0.4.1';function original(name){const r=cp.spawnSync('git',['show',frozen+':preview/dist/'+name],{cwd:project,windowsHide:true,maxBuffer:4000000});if(r.status!==0)throw Error('Missing frozen public demo source');return r.stdout;}
 const clean=s=>s.replaceAll('packrivo','demo-business-source').replaceAll('Packrivo','业务项目示例').replaceAll('真实记录案例','演示案例').replaceAll('personal-workbench.preview.v1','workbench-friend-demo.browser.v1').replaceAll('本机文件','当前浏览器').replaceAll('本机资料','演示资料').replaceAll('本机原文','演示说明').replaceAll('本地工作台','工作台演示版').replaceAll('本机结果','演示记录').replaceAll('本机想法','浏览器想法').replaceAll('本地计划','浏览器计划').replaceAll('本机服务','演示模式').replaceAll('本机项目','演示项目').replaceAll('真实主知识页可直接在本机预览。','示例入口用于体验分类与查看说明。');
-for(const name of files){let body=clean(fs.readFileSync(path.join(source,name),'utf8'));
+for(const name of files){let body=clean(original(name).toString('utf8'));
  if(name==='index.html')body=body.replace('<title>','<meta name="robots" content="noindex,nofollow,noarchive"><link rel="stylesheet" href="demo.css"><title>').replace('本地交互预览','朋友体验版：示例资料，记录仅保存在当前浏览器').replace('src="model.js"></script>','src="model.js"></script><script defer src="demo-api.js"></script>').replace('<body>','<body><div class="demo-notice" role="note"><strong>朋友体验版 · v0.4.1</strong><span>以下为演示资料。可放心试点；记录仅留在你的浏览器，不与他人同步。</span></div>').replace('个人空间 <span>本地预览</span>','演示空间 <span>可点击体验</span>').replace('本机使用 · v0.4.1','朋友预览 · v0.4.1').replace('记录保存在本机文件，浏览器留副本','试填记录仅保存到当前浏览器');
  if(name==='app.js')body=body.replace(/    if\(a==='guide'\)\{[^\n]+\n/,"    if(a==='guide'){modal('朋友体验版使用说明','<div class=\"detail-block\"><h3>可以试什么？</h3><p>八个板块、任务勾选和新增、选题卡与三个平台状态、想法便签、备注、日周月复盘。</p><h3>记录保存在哪里？</h3><p>只保存到你当前使用的浏览器。不同人互不影响，也不与本机正式工作台同步；清理浏览器数据会清除记录。</p><h3>演示边界</h3><p>项目、作品、Skill、知识和资讯均为示例或固定公开入口；没有上传私人原件。AI只展示用途说明，不接受密钥、不调用付费模型、不自动发帖。</p></div>','演示说明');return;}\n");
  if(name==='enrich.js'){
@@ -18,9 +19,9 @@ for(const name of files){let body=clean(fs.readFileSync(path.join(source,name),'
  body=body.replaceAll('保存到本机','保存到当前浏览器').replaceAll('本机，','当前浏览器，').replaceAll('记录保存在当前浏览器，浏览器留副本','演示记录只保存在当前浏览器').replaceAll('本机记录','浏览器记录').replaceAll('本机卡片','浏览器卡片');
  fs.writeFileSync(path.join(dist,name),body);
 }
-const tracked=cp.spawnSync('git',['ls-files','-z','preview/dist/assets'],{cwd:project,encoding:'utf8',windowsHide:true});if(tracked.status!==0)throw Error('Tracked asset inventory unavailable');
-for(const file of tracked.stdout.split('\0').filter(Boolean)){if(!/\.(svg|png|ico|txt)$/.test(file))throw Error('Unexpected asset');fs.copyFileSync(path.join(project,file),path.join(dist,'assets',path.basename(file)));}
-const ctx={window:{}};vm.runInNewContext(fs.readFileSync(path.join(source,'data.js'),'utf8'),ctx);const base=ctx.window.WBData;
+const tracked=cp.spawnSync('git',['ls-tree','-r','--name-only','-z',frozen,'--','preview/dist/assets'],{cwd:project,encoding:'utf8',windowsHide:true});if(tracked.status!==0)throw Error('Tracked asset inventory unavailable');
+for(const file of tracked.stdout.split('\0').filter(Boolean)){if(!/\.(svg|png|ico|txt)$/.test(file))throw Error('Unexpected asset');fs.writeFileSync(path.join(dist,'assets',path.basename(file)),original('assets/'+path.basename(file)));}
+const ctx={window:{}};vm.runInNewContext(original('data.js').toString('utf8'),ctx);const base=ctx.window.WBData;
 const tool=(id,name,minutes,tone,title,trial)=>({id,name,minutes,tone,title,trial,monogram:name.slice(0,1),type:'工具试用示例',label:'演示卡',summary:'体验从了解用途，到安排一次小尝试，再保留结果。',benefit:'把想尝试的工具，变成一个清楚的小任务。',capability:'此卡展示工具介绍与试用流程，不代表特定产品能力。',cases:'示例用途：整理公开资料、拆解步骤、检查结果。',criteria:'留下输入、结果和一次人工检查记录。',source:null,date:'演示示例，非最新资讯',limits:'未接入真实账号或模型，点击仅加入浏览器内的尝试清单。'});
 const data={sections:base.sections.map(s=>({...s,help:s.help.replaceAll('本机文件','当前浏览器').replaceAll('浏览器另留副本','不与他人同步')})),tasks:[],projects:[],ideas:[],workflows:base.workflows,tools:[tool('demo-research','资料整理助手',20,'indigo','用一次小尝试，判断工具是否有用','用虚构的一段公开产品介绍，列出需要核对的事实。'),tool('demo-workflow','流程规划助手',15,'teal','把模糊想法，拆成可以开始的步骤','用虚构任务写出输入、步骤、输出和完成标准。')]};
 fs.writeFileSync(path.join(dist,'data.js'),'window.WBData='+JSON.stringify(data,null,2)+';\n');

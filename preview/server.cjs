@@ -12,7 +12,8 @@ const cacheDir=path.resolve(process.env.WORKBENCH_PUBLIC_CACHE_DIR||path.join(__
 const {createRelay,RelayError}=require('./lib/ai-relay.cjs');
 const ai=createRelay({localDir,maxUpstreamCalls:process.env.WORKBENCH_AI_MAX_CALLS===undefined?Infinity:Number(process.env.WORKBENCH_AI_MAX_CALLS)});
 const loadedVersion=fs.readFileSync(path.resolve(__dirname,'../VERSION'),'utf8').trim();
-const codeFingerprint=crypto.createHash('sha256').update(Buffer.concat(['server.cjs','lib/ai-config.cjs','lib/ai-relay.cjs','lib/ai-images.cjs','lib/catalog-loader.cjs','lib/catalog-worker.cjs','lib/library.cjs','dist/model.js'].map(name=>fs.readFileSync(path.join(__dirname,name))))).digest('hex');
+const codeFingerprint=crypto.createHash('sha256').update(Buffer.concat(['server.cjs','lib/ai-config.cjs','lib/ai-relay.cjs','lib/ai-images.cjs','lib/catalog-loader.cjs','lib/catalog-worker.cjs','lib/library.cjs','dist/model.js','lib/growth-store.cjs','dist/growth-model.js','lib/site-health.cjs','lib/site-probe.ps1'].map(name=>fs.readFileSync(path.join(__dirname,name))))).digest('hex');
+const siteHealth=require('./lib/site-health.cjs').createSiteHealth({dir:localDir});
 const port=Number(process.env.WORKBENCH_PORT)||8869;
 const hosts=new Set(['localhost:'+port,'127.0.0.1:'+port]);
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.pdf':'application/pdf'};
@@ -38,6 +39,10 @@ const server=http.createServer(async(req,res)=>{
   if(url.startsWith('/api/')){
    if(!['GET','HEAD','POST'].includes(req.method)){send(res,405,{error:'不支持的操作'});return;}
    if(url==='/api/health'&&req.method==='GET'){send(res,200,{name:'personal-workbench',version:loadedVersion,codeFingerprint,loading:catalogLoader.loading,...(catalogLoader.error?{error:catalogLoader.error}:{}),aiCalls:ai.diagnostics()});return;}
+   if(url==='/api/growth'&&req.method==='GET'){send(res,200,{state:require('./lib/growth-store.cjs').readGrowth(localDir)});return;}
+   if(url==='/api/growth'&&req.method==='POST'){const revision=req.headers['x-workbench-growth-revision'];if(!/^\d+$/.test(revision||'')){send(res,400,{error:'请先读取最新资料再保存'});return;}try{send(res,200,{saved:true,state:require('./lib/growth-store.cjs').writeGrowth(localDir,await body(req),{expectedModifiedAt:Number(revision)})});}catch(err){if(err.code==='conflict')send(res,409,{error:err.message});else throw err;}return;}
+   if(url==='/api/site-health'&&req.method==='GET'){send(res,200,siteHealth.read());return;}
+   if(url==='/api/site-health/check'&&req.method==='POST'){if(req.headers['x-workbench-action']!=='manual'||!String(req.headers['content-type']||'').startsWith('application/json')){send(res,403,{error:'请点击工作台的公开检查按钮'});return;}const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length){send(res,400,{error:'只检查固定Packrivo入口，不接受任意网址或额外内容'});return;}send(res,200,await siteHealth.check());return;}
    if(url==='/api/ai/status'&&req.method==='GET'){send(res,200,ai.status());return;}
    if(['/api/ai/text','/api/ai/image','/api/ai/explain-news'].includes(url)&&req.method==='POST'){
     if(req.headers['x-workbench-action']!=='manual'||!String(req.headers['content-type']||'').startsWith('application/json')){send(res,403,{error:'请通过工作台的生成按钮手动提交'});return;}
