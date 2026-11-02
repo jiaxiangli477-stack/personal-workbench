@@ -7,6 +7,7 @@ preview/local-data/
 preview/public-cache/
 preview/dist/library.js
 preview/dist/media/
+preview/dist/assets/reference-previews/
 preview/.env
 preview/.env.*
 !docs/
