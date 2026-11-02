@@ -61,7 +61,8 @@ const server=http.createServer(async(req,res)=>{
    if(url==='/api/library/refresh'&&req.method==='POST'){send(res,200,await refreshCatalog());return;}
    if(url==='/api/state'&&req.method==='GET'){send(res,200,{state:library.readState(localDir)});return;}
    if(url==='/api/state/legacy-backup'&&req.method==='POST'){const input=await body(req);if(!input||Object.keys(input).some(k=>k!=='state')){send(res,400,{error:'旧记录备份只接受state'});return;}send(res,200,{saved:true,...library.backupLegacyState(localDir,input.state)});return;}
-   if(url==='/api/state'&&req.method==='POST'){const valid=library.writeState(localDir,await body(req));send(res,200,{saved:true,version:valid.version});return;}
+   if(url==='/api/state'&&req.method==='POST'){const revision=req.headers['x-workbench-state-revision'];if(!/^\d+$/.test(revision||'')){send(res,428,{error:'请刷新到新版工作台并读取最新记录后再保存',code:'revision_required'});return;}try{const valid=library.writeState(localDir,await body(req),{expectedModifiedAt:Number(revision)});send(res,200,{saved:true,version:valid.version,modifiedAt:valid.modifiedAt});}catch(err){if(err.code==='conflict')send(res,409,{error:err.message,code:'conflict'});else throw err;}return;}
+   if(url==='/api/state/recovery-backup'&&req.method==='POST'){send(res,200,{saved:true,...library.backupRecoveryState(localDir,await body(req))});return;}
    if(url==='/api/state/backup'&&req.method==='POST'){send(res,200,{saved:true,path:library.backupState(localDir)});return;}
    if(url==='/api/news'&&req.method==='GET'){send(res,200,await require('./lib/public-news.cjs').readNews(cacheDir));return;}
    if(url==='/api/news/refresh'&&req.method==='POST'){
